@@ -11,3 +11,8 @@ prime_size = 128
 path = "src/addition_simple.py"
 name = "addition_simple"
 prime_size = 128
+
+[[programs]]
+path = "src/identicall.py"
+name = "identicall"
+prime_size = 128

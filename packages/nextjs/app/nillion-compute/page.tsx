@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
-import CodeSnippet from "~~/components/nillion/CodeSnippet";
 import { CopyString } from "~~/components/nillion/CopyString";
 import { NillionOnboarding } from "~~/components/nillion/NillionOnboarding";
 import RetrieveSecretCommand from "~~/components/nillion/RetrieveSecretCommand";
@@ -11,7 +11,6 @@ import SecretForm from "~~/components/nillion/SecretForm";
 import { Address } from "~~/components/scaffold-eth";
 import { compute } from "~~/utils/nillion/compute";
 import { getUserKeyFromSnap } from "~~/utils/nillion/getUserKeyFromSnap";
-import { retrieveSecretCommand } from "~~/utils/nillion/retrieveSecretCommand";
 import { retrieveSecretInteger } from "~~/utils/nillion/retrieveSecretInteger";
 import { storeProgram } from "~~/utils/nillion/storeProgram";
 import { storeSecretsInteger } from "~~/utils/nillion/storeSecretsInteger";
@@ -28,9 +27,10 @@ const Home: NextPage = () => {
   const [nillion, setNillion] = useState<any>(null);
   const [nillionClient, setNillionClient] = useState<any>(null);
 
-  const [programName] = useState<string>("addition_simple");
+  const [programName] = useState<string>("identicall");
   const [programId, setProgramId] = useState<string | null>(null);
   const [computeResult, setComputeResult] = useState<string | null>(null);
+  const [identifier, setIdentifier] = useState("");
 
   const [storedSecretsNameToStoreId, setStoredSecretsNameToStoreId] = useState<StringObject>({
     my_int1: null,
@@ -46,10 +46,29 @@ const Home: NextPage = () => {
     setConnectedToSnap(snapResponse?.connectedToSnap || false);
   }
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   // store program in the Nillion network and set the resulting program id
-  async function handleStoreProgram() {
-    await storeProgram(nillionClient, programName).then(setProgramId);
-  }
+  const handleStoreProgram = useCallback(async () => {
+    const newProgramId = await storeProgram(nillionClient, programName);
+    const queryString = new URLSearchParams({
+      ...Object.fromEntries(searchParams.entries()),
+      p: encodeURIComponent(newProgramId),
+      i: encodeURIComponent(identifier),
+    });
+    router.replace(`${pathname}?${queryString}`);
+  }, [nillionClient, programName, searchParams, identifier, router, pathname]);
+  useEffect(() => {
+    const pArg = searchParams.get("p");
+    if (pArg) {
+      setProgramId(pArg);
+    }
+    const iArg = searchParams.get("i");
+    if (iArg) {
+      setIdentifier(iArg);
+    }
+  }, [searchParams]);
 
   async function handleRetrieveInt(secret_name: string, store_id: string | null) {
     if (store_id) {
@@ -76,6 +95,7 @@ const Home: NextPage = () => {
 
   // Initialize nillionClient for use on page
   useEffect(() => {
+    console.log({ userKey });
     if (userKey) {
       const getNillionClientLibrary = async () => {
         const nillionClientUtil = await import("~~/utils/nillion/nillionClient");
@@ -136,7 +156,8 @@ const Home: NextPage = () => {
       <div className="flex items-center flex-col pt-10">
         <div className="px-5 flex flex-col">
           <h1 className="text-xl">
-            <span className="block text-4xl font-bold">Demo: Explore Blind Computation on Nillion</span>
+            <span className="block text-4xl font-bold text-center">Identicall</span>
+            <span className="block text-xl font-bold text-center mt-2">Fight sybil attacks on social graphs</span>
             {!connectedAddress && <p>Connect your MetaMask Flask wallet</p>}
             {connectedAddress && connectedToSnap && !userKey && (
               <a target="_blank" href="https://nillion-snap-site.vercel.app/" rel="noopener noreferrer">
@@ -192,24 +213,40 @@ const Home: NextPage = () => {
           <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
             {!connectedToSnap ? (
               <NillionOnboarding />
+            ) : !programId ? (
+              <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-[700px] rounded-3xl my-2">
+                <h1 className="text-xl">Launch an investigation!</h1>
+                <p className="text-left">
+                  Press the button below to start an investigation and invite the others to see if you all know the same
+                  BrightID of the person. Optionally, you can type an identifier of the person (e.g. Discord Id, phone
+                  number, etc) to share
+                </p>
+                <div>
+                  <label htmlFor="secret" className="block text-sm font-medium text-white">
+                    Known Identifier of the Person (Optional)
+                  </label>
+                  <input
+                    value={identifier}
+                    onChange={e => setIdentifier(e.target.value)}
+                    required
+                    className={`mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black`}
+                  />
+                </div>
+                <button className="btn btn-sm btn-primary mt-4" onClick={handleStoreProgram}>
+                  Start
+                </button>
+              </div>
             ) : (
               <div>
                 <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-m rounded-3xl my-2">
                   <h1 className="text-xl">Step 1: Store a Nada program</h1>
-                  {!programId ? (
-                    <button className="btn btn-sm btn-primary mt-4" onClick={handleStoreProgram}>
-                      Store {programName} program
-                    </button>
-                  ) : (
-                    <div>
-                      ✅ {programName} program stored <br />
-                      <span className="flex">
-                        <CopyString str={programId} start={5} end={programName.length + 5} textBefore="program_id: " />
-                      </span>
-                    </div>
-                  )}
-
-                  <CodeSnippet program_name={programName} />
+                  <div>
+                    ✅ {programName} program stored <br />
+                    <span className="flex">
+                      <CopyString str={programId} start={5} end={programName.length + 5} textBefore="program_id: " />
+                    </span>
+                  </div>
+                  {/*<CodeSnippet program_name={programName} />*/}
                 </div>
 
                 <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center w-full rounded-3xl my-2 justify-between">
