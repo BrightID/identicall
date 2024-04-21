@@ -33,7 +33,7 @@ export async function compute(
 
     // iterate through computeTimeSecrets, inserting each into the compute_time_secrets object
     for (const compute_secret of computeTimeSecrets) {
-      const newComputeTimeSecret = nillion.Secret.new_integer(compute_secret.value.toString());
+      const newComputeTimeSecret = nillion.Secret.new_unsigned_integer(compute_secret.value.toString());
       compute_time_secrets.insert(compute_secret.name, newComputeTimeSecret);
     }
 
@@ -42,7 +42,7 @@ export async function compute(
 
     // iterate through computeTimeSecrets, inserting each into the compute_time_secrets object
     for (const public_variable of publicVariables) {
-      const newPublicVariable = nillion.Secret.new_integer(public_variable.value.toString());
+      const newPublicVariable = nillion.Secret.new_unsigned_integer(public_variable.value.toString());
       compute_time_secrets.insert(public_variable.name, newPublicVariable);
     }
 
