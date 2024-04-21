@@ -16,6 +16,7 @@ interface SecretFormProps {
   customSecretName?: boolean;
   hidePermissions?: boolean;
   itemName?: string;
+  stateText?: string;
 }
 
 const SecretForm: React.FC<SecretFormProps> = ({
@@ -27,10 +28,10 @@ const SecretForm: React.FC<SecretFormProps> = ({
   secretType,
   hidePermissions = false,
   itemName = "secret",
+  stateText,
 }) => {
   const [secretNameFromForm, setSecretNameFromForm] = useState(secretName);
   const [secret, setSecret] = useState("");
-  const [loading, setLoading] = useState(isLoading);
   const [permissionedUserIdForRetrieveSecret, setPermissionedUserIdForRetrieveSecret] = useState("");
   const [permissionedUserIdForUpdateSecret, setPermissionedUserIdForUpdateSecret] = useState("");
   const [permissionedUserIdForDeleteSecret, setPermissionedUserIdForDeleteSecret] = useState("");
@@ -38,7 +39,6 @@ const SecretForm: React.FC<SecretFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     onSubmit(
       secretNameFromForm,
       secret,
@@ -54,8 +54,8 @@ const SecretForm: React.FC<SecretFormProps> = ({
     setSecret("");
   };
 
-  return loading ? (
-    "Storing secret..."
+  return stateText ? (
+    stateText
   ) : (
     <form onSubmit={handleSubmit} className={`text-black ${isDisabled ? "opacity-50" : ""}`}>
       <div>

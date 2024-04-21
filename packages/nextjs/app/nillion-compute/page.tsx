@@ -2,13 +2,15 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { prepareWriteContract, waitForTransaction, writeContract } from "@wagmi/core";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
+import { useAccount, useContractRead } from "wagmi";
 import { CopyString } from "~~/components/nillion/CopyString";
 import { NillionOnboarding } from "~~/components/nillion/NillionOnboarding";
 import RetrieveSecretCommand from "~~/components/nillion/RetrieveSecretCommand";
 import SecretForm from "~~/components/nillion/SecretForm";
 import { Address } from "~~/components/scaffold-eth";
+import { useDeployedContractInfo } from "~~/hooks/scaffold-eth";
 import { compute } from "~~/utils/nillion/compute";
 import { getUserKeyFromSnap } from "~~/utils/nillion/getUserKeyFromSnap";
 import { retrieveSecretInteger } from "~~/utils/nillion/retrieveSecretInteger";
@@ -20,6 +22,16 @@ interface StringObject {
 }
 
 const Home: NextPage = () => {
+  const { data: deployedContractData } = useDeployedContractInfo("YourContract");
+  const [programId, setProgramId] = useState<string | null>(null);
+  const { data: currentRespondersCount } = useContractRead({
+    address: deployedContractData?.address,
+    functionName: "getPartiesAndSecretsCount",
+    abi: deployedContractData?.abi,
+    args: programId ? [programId] : undefined,
+    watch: true,
+  });
+
   const { address: connectedAddress } = useAccount();
   const [connectedToSnap, setConnectedToSnap] = useState<boolean>(false);
   const [userKey, setUserKey] = useState<string | null>(null);
@@ -28,7 +40,6 @@ const Home: NextPage = () => {
   const [nillionClient, setNillionClient] = useState<any>(null);
 
   const [programName] = useState<string>("identicall");
-  const [programId, setProgramId] = useState<string | null>(null);
   const [computeResult, setComputeResult] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState("");
   const [brightId, setBrightId] = useState("");
@@ -36,8 +47,6 @@ const Home: NextPage = () => {
     my_int1: null,
     my_int2: null,
   });
-  const [parties] = useState<string[]>(["Responder0"]);
-  const [outputs] = useState<string[]>(["my_output"]);
 
   // connect to snap
   async function handleConnectToSnap() {
@@ -111,6 +120,8 @@ const Home: NextPage = () => {
     }
   }, [userKey]);
 
+  const [stateText, setStateText] = useState("");
+
   // handle form submit to store secrets with bindings
   async function handleSecretFormSubmit(
     secretName: string,
@@ -120,46 +131,69 @@ const Home: NextPage = () => {
     permissionedUserIdForDeleteSecret: string | null,
     permissionedUserIdForComputeSecret: string | null,
   ) {
-    if (programId) {
-      const partyName = parties[0];
+    try {
+      if (programId && deployedContractData && currentRespondersCount !== undefined) {
+        setStateText("Storing secret...");
+        const partyName = "Responder" + String(currentRespondersCount);
 
-      const encoder = new TextEncoder();
-      const data = encoder.encode(secretValue);
-      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer)); // Convert buffer to byte array
-      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join(""); // Convert bytes to hex string
-      const secretValueParsed = BigInt("0x" + hashHex).toString();
+        const encoder = new TextEncoder();
+        const data = encoder.encode(secretValue);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer)); // Convert buffer to byte array
+        const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join(""); // Convert bytes to hex string
+        const secretValueParsed = BigInt("0x" + hashHex).toString();
 
-      await storeSecretsInteger(
-        nillion,
-        nillionClient,
-        [{ name: secretName, value: secretValueParsed }],
-        programId,
-        partyName,
-        permissionedUserIdForRetrieveSecret ? [permissionedUserIdForRetrieveSecret] : [],
-        permissionedUserIdForUpdateSecret ? [permissionedUserIdForUpdateSecret] : [],
-        permissionedUserIdForDeleteSecret ? [permissionedUserIdForDeleteSecret] : [],
-        permissionedUserIdForComputeSecret ? [permissionedUserIdForComputeSecret] : [],
-      ).then(async (store_id: string) => {
+        const store_id = await storeSecretsInteger(
+          nillion,
+          nillionClient,
+          [{ name: secretName, value: secretValueParsed }],
+          programId,
+          partyName,
+          permissionedUserIdForRetrieveSecret ? [permissionedUserIdForRetrieveSecret] : [],
+          permissionedUserIdForUpdateSecret ? [permissionedUserIdForUpdateSecret] : [],
+          permissionedUserIdForDeleteSecret ? [permissionedUserIdForDeleteSecret] : [],
+          permissionedUserIdForComputeSecret ? [permissionedUserIdForComputeSecret] : [],
+        );
+        const partyIdToSecretId = `${nillionClient.party_id}:${store_id}`;
+        const { request } = await prepareWriteContract({
+          address: deployedContractData.address,
+          abi: deployedContractData.abi,
+          functionName: "addPartyAndSecret",
+          args: [programId, partyIdToSecretId],
+        });
+        setStateText("Awaiting user confirmation...");
+        const { hash } = await writeContract(request);
+        setStateText("Sending transaction...");
+        await waitForTransaction({
+          hash,
+        });
         console.log("Secret stored at store_id:", store_id);
         setStoredSecretsNameToStoreId(prevSecrets => ({
           ...prevSecrets,
           [secretName]: store_id,
         }));
-      });
+        setStateText("");
+      }
+    } catch (e) {
+      setStateText("");
     }
   }
 
   // compute on secrets
   async function handleCompute() {
     if (programId) {
-      await compute(nillion, nillionClient, Object.values(storedSecretsNameToStoreId), programId, outputs[0]).then(
-        result => setComputeResult(result),
-      );
+      await compute(
+        nillion,
+        nillionClient,
+        Object.values(storedSecretsNameToStoreId),
+        programId,
+        "same_response_count_for_r4",
+      ).then(result => setComputeResult(result));
     }
   }
 
-  const key = useMemo(() => "r0_response", []);
+  const secretName = useMemo(() => `r${String(currentRespondersCount)}_response`, [currentRespondersCount]);
+  const [verified, setVerified] = useState(false);
 
   return (
     <>
@@ -223,6 +257,13 @@ const Home: NextPage = () => {
           <div className="flex justify-center items-center gap-12 flex-col sm:flex-row">
             {!connectedToSnap ? (
               <NillionOnboarding />
+            ) : !verified ? (
+              <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-[700px] rounded-3xl my-2">
+                <h1 className="text-xl">Verify your Nillion user with BrightID</h1>
+                <button className="btn btn-sm btn-primary mt-4" onClick={() => setVerified(true)}>
+                  Verify
+                </button>
+              </div>
             ) : !programId ? (
               <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-[700px] rounded-3xl my-2">
                 <h1 className="text-xl">Launch an investigation!</h1>
@@ -250,6 +291,10 @@ const Home: NextPage = () => {
               <div>
                 <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center w-full rounded-3xl my-2 justify-between">
                   <h1 className="text-xl">Investigating person with identifier {identifier}</h1>
+                  <h3 className="text-l">
+                    Current responses count:{" "}
+                    {currentRespondersCount !== undefined ? String(currentRespondersCount) : "..."}
+                  </h3>
                   <p>
                     Submit the BrightID that you know from this person. The BrightID you enter is hashed before being
                     sent to the server
@@ -257,24 +302,25 @@ const Home: NextPage = () => {
 
                   <div className="flex flex-row w-full justify-between items-center mx-10">
                     <div className="flex-1 px-2">
-                      {!!storedSecretsNameToStoreId[key] && userKey ? (
+                      {!!storedSecretsNameToStoreId[secretName] && userKey ? (
                         <>
                           <RetrieveSecretCommand
                             secretType="SecretInteger"
                             userKey={userKey}
-                            storeId={storedSecretsNameToStoreId[key]}
-                            secretName={key}
+                            storeId={storedSecretsNameToStoreId[secretName]}
+                            secretName={secretName}
                           />
                           <button
                             className="btn btn-sm btn-primary mt-4"
-                            onClick={() => handleRetrieveInt(key, storedSecretsNameToStoreId[key])}
+                            onClick={() => handleRetrieveInt(secretName, storedSecretsNameToStoreId[secretName])}
                           >
                             👀 Retrieve SecretInteger
                           </button>
                         </>
                       ) : (
                         <SecretForm
-                          secretName={key}
+                          stateText={stateText}
+                          secretName={secretName}
                           hidePermissions={true}
                           onSubmit={handleSecretFormSubmit}
                           isDisabled={!programId}
