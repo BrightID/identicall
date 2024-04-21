@@ -219,9 +219,12 @@ const Home: NextPage = () => {
     }
   }
 
+  const [computing, setComputing] = useState(false);
+
   // compute on secrets
   async function handleCompute() {
     if (programId) {
+      setComputing(true);
       // await compute(
       //   nillion,
       //   nillionClient,
@@ -263,6 +266,7 @@ const Home: NextPage = () => {
         console.log("error", error);
         return "error";
       }
+      setComputing(false);
     }
   }
 
@@ -413,15 +417,19 @@ const Home: NextPage = () => {
                                   value={partyIdToSecretIds}
                                   onChange={e => setPartyIdToSecretIds(e.target.value)}
                                 />
-                                <button
-                                  disabled={!programId}
-                                  onClick={handleCompute}
-                                  className={`mt-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                                    !programId ? "opacity-75 cursor-not-allowed bg-indigo-400" : "bg-indigo-600"
-                                  }`}
-                                >
-                                  Compute
-                                </button>
+                                {computing ? (
+                                  "Computing..."
+                                ) : (
+                                  <button
+                                    disabled={!programId}
+                                    onClick={handleCompute}
+                                    className={`mt-4 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
+                                      !programId ? "opacity-75 cursor-not-allowed bg-indigo-400" : "bg-indigo-600"
+                                    }`}
+                                  >
+                                    Compute
+                                  </button>
+                                )}
                               </div>
                             ) : (
                               <button
