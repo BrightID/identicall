@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { NextPage } from "next";
 import { useAccount } from "wagmi";
@@ -31,12 +31,12 @@ const Home: NextPage = () => {
   const [programId, setProgramId] = useState<string | null>(null);
   const [computeResult, setComputeResult] = useState<string | null>(null);
   const [identifier, setIdentifier] = useState("");
-
+  const [brightId, setBrightId] = useState("");
   const [storedSecretsNameToStoreId, setStoredSecretsNameToStoreId] = useState<StringObject>({
     my_int1: null,
     my_int2: null,
   });
-  const [parties] = useState<string[]>(["Party1"]);
+  const [parties] = useState<string[]>(["Responder0"]);
   const [outputs] = useState<string[]>(["my_output"]);
 
   // connect to snap
@@ -62,11 +62,11 @@ const Home: NextPage = () => {
   useEffect(() => {
     const pArg = searchParams.get("p");
     if (pArg) {
-      setProgramId(pArg);
+      setProgramId(decodeURIComponent(pArg));
     }
     const iArg = searchParams.get("i");
     if (iArg) {
-      setIdentifier(iArg);
+      setIdentifier(decodeURIComponent(iArg));
     }
   }, [searchParams]);
 
@@ -122,10 +122,18 @@ const Home: NextPage = () => {
   ) {
     if (programId) {
       const partyName = parties[0];
+
+      const encoder = new TextEncoder();
+      const data = encoder.encode(secretValue);
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer)); // Convert buffer to byte array
+      const hashHex = hashArray.map(byte => byte.toString(16).padStart(2, "0")).join(""); // Convert bytes to hex string
+      const secretValueParsed = BigInt("0x" + hashHex).toString();
+
       await storeSecretsInteger(
         nillion,
         nillionClient,
-        [{ name: secretName, value: secretValue }],
+        [{ name: secretName, value: secretValueParsed }],
         programId,
         partyName,
         permissionedUserIdForRetrieveSecret ? [permissionedUserIdForRetrieveSecret] : [],
@@ -150,6 +158,8 @@ const Home: NextPage = () => {
       );
     }
   }
+
+  const key = useMemo(() => "r0_response", []);
 
   return (
     <>
@@ -238,50 +248,40 @@ const Home: NextPage = () => {
               </div>
             ) : (
               <div>
-                <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center max-w-m rounded-3xl my-2">
-                  <h1 className="text-xl">Step 1: Store a Nada program</h1>
-                  <div>
-                    ✅ {programName} program stored <br />
-                    <span className="flex">
-                      <CopyString str={programId} start={5} end={programName.length + 5} textBefore="program_id: " />
-                    </span>
-                  </div>
-                  {/*<CodeSnippet program_name={programName} />*/}
-                </div>
-
                 <div className="flex flex-col bg-base-100 px-10 py-10 text-center items-center w-full rounded-3xl my-2 justify-between">
-                  <h1 className="text-xl">
-                    Step 2: Store secret integers with program bindings to the {programName} program
-                  </h1>
+                  <h1 className="text-xl">Investigating person with identifier {identifier}</h1>
+                  <p>
+                    Submit the BrightID that you know from this person. The BrightID you enter is hashed before being
+                    sent to the server
+                  </p>
 
-                  <div className="flex flex-row w-full justify-between items-center my-10 mx-10">
-                    {Object.keys(storedSecretsNameToStoreId).map(key => (
-                      <div className="flex-1 px-2" key={key}>
-                        {!!storedSecretsNameToStoreId[key] && userKey ? (
-                          <>
-                            <RetrieveSecretCommand
-                              secretType="SecretInteger"
-                              userKey={userKey}
-                              storeId={storedSecretsNameToStoreId[key]}
-                              secretName={key}
-                            />
-                            <button
-                              className="btn btn-sm btn-primary mt-4"
-                              onClick={() => handleRetrieveInt(key, storedSecretsNameToStoreId[key])}
-                            >
-                              👀 Retrieve SecretInteger
-                            </button>
-                          </>
-                        ) : (
-                          <SecretForm
+                  <div className="flex flex-row w-full justify-between items-center mx-10">
+                    <div className="flex-1 px-2">
+                      {!!storedSecretsNameToStoreId[key] && userKey ? (
+                        <>
+                          <RetrieveSecretCommand
+                            secretType="SecretInteger"
+                            userKey={userKey}
+                            storeId={storedSecretsNameToStoreId[key]}
                             secretName={key}
-                            onSubmit={handleSecretFormSubmit}
-                            isDisabled={!programId}
-                            secretType="number"
                           />
-                        )}
-                      </div>
-                    ))}
+                          <button
+                            className="btn btn-sm btn-primary mt-4"
+                            onClick={() => handleRetrieveInt(key, storedSecretsNameToStoreId[key])}
+                          >
+                            👀 Retrieve SecretInteger
+                          </button>
+                        </>
+                      ) : (
+                        <SecretForm
+                          secretName={key}
+                          hidePermissions={true}
+                          onSubmit={handleSecretFormSubmit}
+                          isDisabled={!programId}
+                          secretType="text"
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
 

@@ -57,30 +57,8 @@ const SecretForm: React.FC<SecretFormProps> = ({
   return loading ? (
     "Storing secret..."
   ) : (
-    <form onSubmit={handleSubmit} className={isDisabled ? "opacity-50" : ""}>
-      {!customSecretName && <h1>Store secret: {secretName}</h1>}
-      {customSecretName && (
-        <div>
-          <label htmlFor="secret" className="block text-sm font-medium text-gray-700">
-            Set {itemName} name
-          </label>
-          <input
-            id="secret"
-            value={secretNameFromForm}
-            onChange={e => setSecretNameFromForm(e.target.value)}
-            required
-            disabled={isDisabled}
-            className={`mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${
-              isDisabled ? "cursor-not-allowed bg-gray-100" : "bg-white"
-            }`}
-          />
-        </div>
-      )}
-
+    <form onSubmit={handleSubmit} className={`text-black ${isDisabled ? "opacity-50" : ""}`}>
       <div>
-        <label htmlFor="secret" className="block text-sm font-medium text-gray-700">
-          Set {itemName} value
-        </label>
         <input
           type={secretType}
           id="secret"

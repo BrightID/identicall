@@ -21,7 +21,7 @@ def nada_main():
 
     # 1. Parties initialization
     responders = initialize_responders(nr_responders)
-    outparty = responders[0]
+    outparty = responders[nr_responders - 1]
 
     # 2. Inputs initialization
     responses = inputs_initialization(nr_responders, responders)

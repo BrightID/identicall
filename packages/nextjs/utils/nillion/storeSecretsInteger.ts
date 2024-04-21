@@ -22,9 +22,10 @@ export async function storeSecretsInteger(
 
     // iterate through secretsToStore, inserting each into the secrets object
     for (const secret of secretsToStore) {
+      console.log({ secret });
       // create new SecretInteger with value cast to string
-      const newSecret = nillion.Secret.new_integer(secret.value.toString());
-
+      const newSecret = nillion.Secret.new_unsigned_integer(secret.value.toString());
+      console.log({ newSecret });
       // insert the SecretInteger into secrets object
       secrets.insert(secret.name, newSecret);
     }
