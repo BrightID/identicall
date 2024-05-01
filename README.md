@@ -1,8 +1,7 @@
 # 🏗 Identicall
+See https://forum.brightid.org/t/fighting-small-scale-sybil-attacks-with-known-identifiers/503
 
-This project is using Nillion to allow BrightID users store and compare BrightID of the people they know, without the need to reveal private information. Nillion's javascript boilderplate code with Next.js and hardhat is used for the frontend and smart contract. BrightID is used as an example of unique-identity platform using social graphs
-
-This template has all the power of the [Scaffold-ETH 2 dapp toolkit](https://github.com/scaffold-eth/scaffold-eth-2) with a Nillion integration so that you can store, retrieve, and run blind computation on secrets stored in Nillion.
+This project is using Nillion to allow BrightID users store and compare BrightID of the people they know, without the need to reveal private information.
 
 ## Requirements
 
